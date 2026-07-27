@@ -1,0 +1,15 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "hemogramas",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "fecha", "order": "DESCENDING" }]
+    },
+    {
+      "collectionGroup": "signos",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "fecha", "order": "DESCENDING" }]
+    }
+  ],
+  "fieldOverrides": []
+}
