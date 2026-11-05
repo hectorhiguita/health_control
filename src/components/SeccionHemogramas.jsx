@@ -16,13 +16,14 @@ export default function SeccionHemogramas({ datos, onAgregar, onEliminar }) {
     if (!form.fecha || guardando) return;
     setGuardando(true);
     try {
-      await onAgregar({
+      const ok = await onAgregar({
         fecha: form.fecha,
         hb: num(form.hb), hto: num(form.hto), leucocitos: num(form.leucocitos),
         neutrofilos: num(form.neutrofilos), plaquetas: num(form.plaquetas),
         nota: form.nota.trim(),
       });
-      setForm({ ...VACIO, fecha: hoyISO() });
+      // Si falló, se conserva lo escrito
+      if (ok !== false) setForm({ ...VACIO, fecha: hoyISO() });
     } finally {
       setGuardando(false);
     }
@@ -32,7 +33,7 @@ export default function SeccionHemogramas({ datos, onAgregar, onEliminar }) {
     .map((d) => ({ ...d, etiqueta: fmtFechaCorta(d.fecha) }));
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       <Tarjeta>
         <Etiqueta>Registrar hemograma</Etiqueta>
         <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.ink70, marginBottom: 16 }}>
@@ -98,7 +99,7 @@ export default function SeccionHemogramas({ datos, onAgregar, onEliminar }) {
                     <td style={celda()}><Valor clave="neutrofilos" valor={d.neutrofilos} compacto /></td>
                     <td style={celda()}><Valor clave="plaquetas" valor={d.plaquetas} compacto /></td>
                     <td style={{ ...celda(), textAlign: "right" }}>
-                      <BotonBorrar onClick={() => onEliminar(d.id)} />
+                      <BotonBorrar que={`el hemograma del ${fmtFecha(d.fecha)}`} onClick={() => onEliminar(d.id)} />
                     </td>
                   </tr>
                 ))}

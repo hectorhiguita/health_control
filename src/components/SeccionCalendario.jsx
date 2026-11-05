@@ -26,7 +26,7 @@ function Selector({ label, value, onChange, opciones }) {
   );
 }
 
-function Mes({ anio, mes, eventosPorDia, hoy, onElegir }) {
+function Mes({ anio, mes, eventosPorDia, hoy, elegido, onElegir }) {
   const primero = new Date(anio, mes, 1);
   const inicio = (primero.getDay() + 6) % 7; // lunes = 0
   const total = new Date(anio, mes + 1, 0).getDate();
@@ -36,7 +36,7 @@ function Mes({ anio, mes, eventosPorDia, hoy, onElegir }) {
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4 }}>
       {DIAS.map((d, i) => (
         <div key={i} style={{ fontFamily: FONT_DATA, fontSize: 10, color: C.ink40, textAlign: "center" }}>{d}</div>
       ))}
@@ -44,10 +44,14 @@ function Mes({ anio, mes, eventosPorDia, hoy, onElegir }) {
         if (!f) return <div key={i} />;
         const ev = eventosPorDia[f] || [];
         const esHoy = f === hoy;
+        const esElegido = f === elegido;
         return (
-          <button key={f} onClick={() => onElegir(f)} title={ev.map((e) => e.titulo).join(", ")} style={{
-            minHeight: 46, padding: 4, border: `${esHoy ? 2 : 1}px solid ${esHoy ? C.ink : C.line}`,
-            borderRadius: 2, background: C.surface, cursor: "pointer", textAlign: "left",
+          <button key={f} onClick={() => onElegir(f)} aria-pressed={esElegido}
+            aria-label={`${Number(f.slice(8))}${ev.length ? `: ${ev.map((e) => e.titulo).join(", ")}` : ""}`}
+            title={ev.map((e) => e.titulo).join(", ")} style={{
+            minHeight: 46, minWidth: 0, padding: 4, border: `${esHoy ? 2 : 1}px solid ${esHoy ? C.ink : C.line}`,
+            borderRadius: 2, background: esElegido ? C.sageBg : C.surface, cursor: "pointer", textAlign: "left",
+            boxShadow: esElegido ? `inset 0 0 0 2px ${C.sage}` : "none",
           }}>
             <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.ink }}>{Number(f.slice(8))}</div>
             <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 3 }}>
@@ -89,8 +93,8 @@ export default function SeccionCalendario({ datos, onAgregar, onEliminar }) {
     if (!form.fecha || !form.titulo.trim() || guardando) return;
     setGuardando(true);
     try {
-      await onAgregar({ ...form, titulo: form.titulo.trim() });
-      setForm({ ...VACIO, fecha: form.fecha, tipo: form.tipo });
+      const ok = await onAgregar({ ...form, titulo: form.titulo.trim() });
+      if (ok !== false) setForm({ ...VACIO, fecha: form.fecha, tipo: form.tipo });
     } finally {
       setGuardando(false);
     }
@@ -102,11 +106,12 @@ export default function SeccionCalendario({ datos, onAgregar, onEliminar }) {
     setGuardando(true);
     try {
       for (let d = 0; d < CICLO.diasAplicacion; d++) {
-        await onAgregar({
+        const ok = await onAgregar({
           fecha: sumarDias(form.fecha, d), hora: form.hora, tipo: "azacitidina",
           titulo: `${CICLO.medicamento} — día ${d + 1}`, lugar: form.lugar,
           dosis: form.dosis, nota: form.nota,
         });
+        if (ok === false) break;
       }
     } finally {
       setGuardando(false);
@@ -139,7 +144,7 @@ export default function SeccionCalendario({ datos, onAgregar, onEliminar }) {
                 </div>
               )}
             </td>
-            <td style={{ ...celda(), width: 60 }}><BotonBorrar onClick={() => onEliminar(e.id)} /></td>
+            <td style={{ ...celda(), width: 60 }}><BotonBorrar que={`«${e.titulo}» del ${fmtFecha(e.fecha)}`} onClick={() => onEliminar(e.id)} /></td>
           </tr>
         ))}
       </tbody>
@@ -147,7 +152,7 @@ export default function SeccionCalendario({ datos, onAgregar, onEliminar }) {
   );
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       <Tarjeta>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <Boton variante="linea" onClick={() => mover(-1)}>‹</Boton>
@@ -157,7 +162,10 @@ export default function SeccionCalendario({ datos, onAgregar, onEliminar }) {
           <Boton variante="linea" onClick={() => mover(1)}>›</Boton>
         </div>
         <Mes anio={vista.anio} mes={vista.mes} eventosPorDia={eventosPorDia} hoy={hoy}
-          onElegir={(f) => setForm({ ...form, fecha: f })} />
+          elegido={form.fecha} onElegir={(f) => setForm({ ...form, fecha: f })} />
+        <div style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.ink70, marginTop: 8 }}>
+          Toca un día para agendar en esa fecha.
+        </div>
         <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
           {Object.entries(TIPOS_EVENTO).map(([k, t]) => (
             <span key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: FONT_DATA, fontSize: 10, color: C.ink70, textTransform: "uppercase", letterSpacing: "0.08em" }}>

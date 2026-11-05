@@ -109,12 +109,17 @@ export const celda = (izq) => ({
   fontSize: 13, color: C.ink, verticalAlign: "top",
 });
 
-export function BotonBorrar({ onClick }) {
+/** Pide confirmación: lo borrado no se puede recuperar desde la app. */
+export function BotonBorrar({ onClick, que = "este registro" }) {
+  const confirmar = () => {
+    if (window.confirm(`¿Borrar ${que}? No se puede deshacer.`)) onClick();
+  };
   return (
-    <button onClick={onClick} style={{
+    <button onClick={confirmar} aria-label={`Borrar ${que}`} style={{
       background: "none", border: "none", cursor: "pointer",
       fontFamily: FONT_DATA, fontSize: 10, color: C.ink40,
-      letterSpacing: "0.08em", textTransform: "uppercase", padding: 4,
+      letterSpacing: "0.08em", textTransform: "uppercase",
+      padding: "8px 10px", minHeight: 36,
     }}>Borrar</button>
   );
 }

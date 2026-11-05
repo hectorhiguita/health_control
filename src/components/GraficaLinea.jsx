@@ -23,7 +23,7 @@ export default function GraficaLinea({ titulo, datos, llave, umbralAlarma, umbra
       </div>
       <div style={{ height: 190 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={conDato} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
+          <LineChart data={conDato} margin={{ top: 5, right: 24, left: -18, bottom: 0 }}>
             <ReferenceArea y1={dominio[0]} y2={umbralAlarma} fill={C.crimson} fillOpacity={0.07} />
             <ReferenceArea y1={umbralAlarma} y2={umbralPrecaucion} fill={C.amber} fillOpacity={0.07} />
             <CartesianGrid stroke={C.line} strokeDasharray="2 4" vertical={false} />

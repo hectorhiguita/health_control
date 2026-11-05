@@ -30,7 +30,8 @@ export default function SeccionDocumentos({ datos, onSubir, onAbrir, onEliminar 
     if (!archivo || subiendo) return;
     setSubiendo(true);
     try {
-      await onSubir(archivo, { fecha, categoria, nota: nota.trim() });
+      const ok = await onSubir(archivo, { fecha, categoria, nota: nota.trim() });
+      if (ok === false) return; // se conserva el archivo elegido
       setArchivo(null);
       setNota("");
       if (entrada.current) entrada.current.value = "";
@@ -50,7 +51,7 @@ export default function SeccionDocumentos({ datos, onSubir, onAbrir, onEliminar 
   };
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       <Tarjeta>
         <Etiqueta>Subir examen</Etiqueta>
         <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.ink70, marginBottom: 16 }}>
@@ -95,21 +96,23 @@ export default function SeccionDocumentos({ datos, onSubir, onAbrir, onEliminar 
             <tbody>
               {datos.map((d) => (
                 <tr key={d.id}>
-                  <td style={{ ...celda(true), width: 110, fontFamily: FONT_DATA }}>{fmtFecha(d.fecha)}</td>
-                  <td style={celda(true)}>
-                    <span style={{
-                      fontFamily: FONT_DATA, fontSize: 10, letterSpacing: "0.08em",
-                      textTransform: "uppercase", color: C.slate, marginRight: 8,
-                    }}>{CATEGORIAS_DOC[d.categoria]}</span>
+                  <td style={{ ...celda(true), overflowWrap: "anywhere" }}>
+                    <div style={{ fontFamily: FONT_DATA, fontSize: 11, color: C.ink40, marginBottom: 2 }}>
+                      {fmtFecha(d.fecha)}
+                      <span style={{
+                        letterSpacing: "0.08em", textTransform: "uppercase", color: C.slate, marginLeft: 10,
+                      }}>{CATEGORIAS_DOC[d.categoria]}</span>
+                    </div>
                     {d.nombre}
                     {d.nota && <div style={{ fontFamily: FONT_BODY, fontSize: 11, color: C.ink40, marginTop: 2 }}>{d.nota}</div>}
                   </td>
-                  <td style={{ ...celda(), width: 140, whiteSpace: "nowrap" }}>
-                    <button onClick={() => abrir(d.id)} style={{
+                  <td style={{ ...celda(), width: 1, whiteSpace: "nowrap" }}>
+                    <button onClick={() => abrir(d.id)} aria-label={`Abrir ${d.nombre}`} style={{
                       background: "none", border: "none", cursor: "pointer", fontFamily: FONT_DATA,
-                      fontSize: 10, color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase", padding: 4,
+                      fontSize: 11, color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase",
+                      padding: "8px 10px", minHeight: 36,
                     }}>Abrir</button>
-                    <BotonBorrar onClick={() => onEliminar(d.id)} />
+                    <BotonBorrar que={`el documento «${d.nombre}»`} onClick={() => onEliminar(d.id)} />
                   </td>
                 </tr>
               ))}
