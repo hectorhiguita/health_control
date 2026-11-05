@@ -4,9 +4,18 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.env.production
 *.local
 .DS_Store
-.firebase
-firebase-debug.log
 .vscode/*
 !.vscode/extensions.json
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backend.hcl
+infra/.build/
+crash.log

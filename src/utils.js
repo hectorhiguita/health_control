@@ -34,6 +34,12 @@ export function evaluar(clave, valor) {
   const v = parseFloat(valor);
   if (Number.isNaN(v)) return null;
 
+  if (u.rango) {
+    const [amin, amax] = u.alarmaRango ?? u.rango;
+    if (v < amin || v > amax) return "alarma";
+    if (v < u.rango[0] || v > u.rango[1]) return "precaucion";
+    return "ok";
+  }
   if (u.invertido) {
     if (v >= u.alarma) return "alarma";
     if (v >= u.precaucion) return "precaucion";
@@ -47,7 +53,7 @@ export function evaluar(clave, valor) {
 export const num = (v) =>
   v === "" || v === null || v === undefined ? null : parseFloat(v);
 
-export function armarReporte(paciente, hemogramas, signos, inicioCiclo) {
+export function armarReporte(paciente, hemogramas, signos, inicioCiclo, laboratorios = []) {
   const L = [];
   const pad = (v, n) => String(v ?? "—").padEnd(n);
   L.push(`SEGUIMIENTO CLÍNICO — ${paciente.nombre.toUpperCase()}`);
@@ -70,5 +76,14 @@ export function armarReporte(paciente, hemogramas, signos, inicioCiclo) {
     L.push(`${pad(fmtFecha(d.fecha), 13)} ${pad(d.temp, 6)} ${pad(d.spo2, 6)} ${pad(d.peso, 6)} ${pad(pa, 10)} ${pad(d.fc, 4)}`);
     if (d.nota) L.push(`              ${d.nota}`);
   });
+  if (laboratorios.length) {
+    L.push("");
+    L.push("COLESTEROL Y TIROIDES");
+    L.push("Fecha         ColT   LDL    HDL    TG     TSH    T4L    T3");
+    [...laboratorios].sort((a, b) => a.fecha.localeCompare(b.fecha)).forEach((d) => {
+      L.push(`${pad(fmtFecha(d.fecha), 13)} ${pad(d.colTotal, 6)} ${pad(d.ldl, 6)} ${pad(d.hdl, 6)} ${pad(d.trigliceridos, 6)} ${pad(d.tsh, 6)} ${pad(d.t4l, 6)} ${pad(d.t3, 5)}`);
+      if (d.nota) L.push(`              ${d.nota}`);
+    });
+  }
   return L.join("\n");
 }

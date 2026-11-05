@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { C, FONT_DISPLAY, FONT_BODY, FONT_DATA } from "./tokens";
 import { PACIENTE } from "./constantes";
-import { fmtFecha, armarReporte } from "./utils";
+import { fmtFecha, armarReporte, hoyISO } from "./utils";
+import { configurado, observarSesion, usuarioActual, salir } from "./auth";
 import {
-  configurado, observarSesion, estaAutorizado, salir,
-} from "./firebase";
-import {
-  escucharHemogramas, escucharSignos, escucharPaciente,
-  agregarHemograma, borrarHemograma, agregarSigno, borrarSigno,
-  guardarInicioCiclo, sembrarSiHaceFalta,
+  cargarTodo, agregar, borrar, guardarInicioCiclo, sembrarSiHaceFalta,
+  subirDocumento, urlDocumento, borrarDocumento, preguntarAsistente,
 } from "./datos";
 
 import Acceso from "./components/Acceso";
@@ -17,6 +14,10 @@ import BandaEstado from "./components/BandaEstado";
 import RejillaCiclo from "./components/RejillaCiclo";
 import SeccionHemogramas from "./components/SeccionHemogramas";
 import SeccionSignos from "./components/SeccionSignos";
+import SeccionLaboratorios from "./components/SeccionLaboratorios";
+import SeccionCalendario from "./components/SeccionCalendario";
+import SeccionDocumentos from "./components/SeccionDocumentos";
+import SeccionAsistente from "./components/SeccionAsistente";
 import SeccionAlarmas from "./components/SeccionAlarmas";
 import { Tarjeta, Etiqueta, Boton, Valor } from "./components/ui";
 
@@ -24,62 +25,83 @@ const PESTANAS = [
   ["resumen", "Resumen"],
   ["hemogramas", "Hemogramas"],
   ["signos", "Signos vitales"],
+  ["laboratorios", "Colesterol y tiroides"],
+  ["calendario", "Calendario"],
+  ["documentos", "Documentos"],
+  ["asistente", "Asistente"],
   ["alarmas", "Alarmas"],
 ];
 
+const VACIO = { perfil: {}, hemogramas: [], signos: [], laboratorios: [], eventos: [], documentos: [] };
+
 export default function App() {
   const [sesion, setSesion] = useState({ estado: "cargando", usuario: null });
-  const [hemogramas, setHemogramas] = useState([]);
-  const [signos, setSignos] = useState([]);
-  const [inicioCiclo, setInicioCiclo] = useState("");
+  const [datos, setDatos] = useState(VACIO);
   const [pestana, setPestana] = useState("resumen");
   const [aviso, setAviso] = useState(null);
   const [copiado, setCopiado] = useState(false);
   const [listo, setListo] = useState(false);
 
+  const { hemogramas, signos, laboratorios, eventos, documentos } = datos;
+  const inicioCiclo = datos.perfil?.inicioCiclo || "";
+
   /* Sesión */
   useEffect(() => {
     if (!configurado) return;
-    return observarSesion((u) => {
-      if (!u) setSesion({ estado: "fuera", usuario: null });
-      else if (!estaAutorizado(u)) setSesion({ estado: "rechazado", usuario: u });
-      else setSesion({ estado: "dentro", usuario: u });
-    });
+    const revisar = async () => {
+      const u = await usuarioActual();
+      setSesion(u ? { estado: "dentro", usuario: u } : { estado: "fuera", usuario: null });
+    };
+    revisar();
+    return observarSesion(revisar);
   }, []);
 
-  /* Suscripciones a Firestore */
+  const alFallar = useCallback((e, msg) => {
+    if (e?.estado === 403) setAviso("Esta cuenta no tiene acceso. Pide que la agreguen al grupo «familia» en Cognito.");
+    else setAviso(e?.message ? `${msg} (${e.message})` : msg);
+  }, []);
+
+  const recargar = useCallback(async () => {
+    const d = await cargarTodo();
+    setDatos(d);
+    return d;
+  }, []);
+
+  /* Primera carga */
   useEffect(() => {
     if (sesion.estado !== "dentro") return;
     let cancelado = false;
+    (async () => {
+      try {
+        const d = await recargar();
+        if (await sembrarSiHaceFalta(d)) await recargar();
+      } catch (e) {
+        if (!cancelado) alFallar(e, "No se pudieron cargar los registros.");
+      } finally {
+        if (!cancelado) setListo(true);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [sesion.estado, recargar, alFallar]);
 
-    const alFallar = (e) => {
-      if (cancelado) return;
-      setAviso(e?.code === "permission-denied"
-        ? "Firestore rechazó la lectura. Revisa que tu correo esté en firestore.rules y que las reglas estén publicadas."
-        : "Se perdió la conexión con la base. Los cambios se guardarán cuando vuelva.");
-    };
-
-    sembrarSiHaceFalta().catch(() => {});
-
-    const u1 = escucharHemogramas((d) => { if (!cancelado) { setHemogramas(d); setListo(true); } }, alFallar);
-    const u2 = escucharSignos((d) => { if (!cancelado) setSignos(d); }, alFallar);
-    const u3 = escucharPaciente((d) => { if (!cancelado) setInicioCiclo(d.inicioCiclo || ""); }, alFallar);
-
-    return () => { cancelado = true; u1(); u2(); u3(); };
-  }, [sesion.estado]);
-
+  /** Ejecuta un cambio y vuelve a leer todo */
   const conError = useCallback(async (fn, msg) => {
-    try { setAviso(null); await fn(); }
-    catch { setAviso(msg); }
-  }, []);
+    try { setAviso(null); const r = await fn(); await recargar(); return r; }
+    catch (e) { alFallar(e, msg); return null; }
+  }, [recargar, alFallar]);
 
   const ultimoHemograma = useMemo(() => hemogramas[0] || null, [hemogramas]);
   const ultimoSigno = useMemo(() => signos[0] || null, [signos]);
+  const proximos = useMemo(() => {
+    const hoy = hoyISO();
+    return eventos.filter((e) => e.fecha >= hoy)
+      .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora)).slice(0, 3);
+  }, [eventos]);
 
   const copiarReporte = async () => {
     try {
       await navigator.clipboard.writeText(
-        armarReporte(PACIENTE, hemogramas, signos, inicioCiclo)
+        armarReporte(PACIENTE, hemogramas, signos, inicioCiclo, laboratorios)
       );
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2200);
@@ -88,10 +110,15 @@ export default function App() {
     }
   };
 
+  const registros = (tipo, nombre) => ({
+    datos: datos[tipo],
+    onAgregar: (d) => conError(() => agregar(tipo, d), `No se pudo guardar ${nombre}.`),
+    onEliminar: (id) => conError(() => borrar(tipo, id), "No se pudo borrar el registro."),
+  });
+
   if (!configurado) return <FaltaConfig />;
   if (sesion.estado === "cargando") return <Pantalla texto="Verificando acceso…" />;
   if (sesion.estado === "fuera") return <Acceso />;
-  if (sesion.estado === "rechazado") return <Acceso motivo="no-autorizado" correo={sesion.usuario.email} />;
   if (!listo) return <Pantalla texto="Cargando registros…" />;
 
   return (
@@ -183,24 +210,36 @@ export default function App() {
                 </div>
               ) : <Vacio texto="Registra los primeros signos vitales en su pestaña." />}
             </Tarjeta>
+
+            <Tarjeta style={{ marginTop: 24 }}>
+              <Etiqueta>Próximo en el calendario</Etiqueta>
+              {proximos.length ? proximos.map((e) => (
+                <div key={e.id} style={{ fontFamily: FONT_BODY, fontSize: 14, color: C.ink, padding: "6px 0" }}>
+                  <span style={{ fontFamily: FONT_DATA, fontSize: 12, color: C.ink40, marginRight: 10 }}>
+                    {fmtFecha(e.fecha)}{e.hora && ` ${e.hora}`}
+                  </span>
+                  {e.titulo}
+                </div>
+              )) : <Vacio texto="No hay citas ni aplicaciones agendadas." />}
+            </Tarjeta>
           </>
         )}
 
-        {pestana === "hemogramas" && (
-          <SeccionHemogramas
-            datos={hemogramas}
-            onAgregar={(d) => conError(() => agregarHemograma(d), "No se pudo guardar el hemograma.")}
-            onEliminar={(id) => conError(() => borrarHemograma(id), "No se pudo borrar el registro.")}
+        {pestana === "hemogramas" && <SeccionHemogramas {...registros("hemogramas", "el hemograma")} />}
+        {pestana === "signos" && <SeccionSignos {...registros("signos", "los signos")} />}
+        {pestana === "laboratorios" && <SeccionLaboratorios {...registros("laboratorios", "los resultados")} />}
+        {pestana === "calendario" && <SeccionCalendario {...registros("eventos", "el evento")} />}
+
+        {pestana === "documentos" && (
+          <SeccionDocumentos
+            datos={documentos}
+            onSubir={(f, meta) => conError(() => subirDocumento(f, meta), "No se pudo subir el documento.")}
+            onAbrir={(id) => urlDocumento(id).catch((e) => { alFallar(e, "No se pudo abrir el documento."); return null; })}
+            onEliminar={(id) => conError(() => borrarDocumento(id), "No se pudo borrar el documento.")}
           />
         )}
 
-        {pestana === "signos" && (
-          <SeccionSignos
-            datos={signos}
-            onAgregar={(d) => conError(() => agregarSigno(d), "No se pudieron guardar los signos.")}
-            onEliminar={(id) => conError(() => borrarSigno(id), "No se pudo borrar el registro.")}
-          />
-        )}
+        {pestana === "asistente" && <SeccionAsistente onPreguntar={preguntarAsistente} />}
 
         {pestana === "alarmas" && <SeccionAlarmas />}
 

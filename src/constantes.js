@@ -38,6 +38,47 @@ export const UMBRALES = {
     accion: "URGENCIAS INMEDIATO — un solo registro de 38 °C o más en neutropenia",
   },
   spo2: { label: "Saturación O₂", unidad: "%", alarma: 90, precaucion: 93 },
+
+  /* Colesterol y tiroides: rangos generales de adulto.
+     Ajústalos a los que imprime el laboratorio de cada examen.
+     "Alarma" aquí significa "alto, avisar al médico", no urgencias. */
+  colTotal: {
+    label: "Colesterol total", unidad: "mg/dL", alarma: 240, precaucion: 200, invertido: true,
+    dominio: [100, 320],
+  },
+  ldl: {
+    label: "LDL", unidad: "mg/dL", alarma: 160, precaucion: 130, invertido: true,
+    dominio: [40, 240],
+  },
+  hdl: { label: "HDL", unidad: "mg/dL", alarma: 40, precaucion: 50, dominio: [20, 100] },
+  trigliceridos: {
+    label: "Triglicéridos", unidad: "mg/dL", alarma: 200, precaucion: 150, invertido: true,
+    dominio: [40, 400],
+  },
+  tsh: { label: "TSH", unidad: "mUI/L", rango: [0.4, 4.0], alarmaRango: [0.1, 10], dominio: [0, 12] },
+  t4l: { label: "T4 libre", unidad: "ng/dL", rango: [0.8, 1.8], alarmaRango: [0.5, 2.5], dominio: [0, 3] },
+  t3:  { label: "T3", unidad: "ng/dL", rango: [80, 200], alarmaRango: [50, 250], dominio: [0, 300] },
+};
+
+/* Grupos de la pestaña Laboratorios */
+export const GRUPOS_LAB = [
+  { id: "lipidos", titulo: "Colesterol", claves: ["colTotal", "ldl", "hdl", "trigliceridos"] },
+  { id: "tiroides", titulo: "Tiroides", claves: ["tsh", "t4l", "t3"] },
+];
+
+export const TIPOS_EVENTO = {
+  azacitidina: { label: "Azacitidina", color: "#2E4257" },
+  cita: { label: "Cita médica", color: "#3F7A6B" },
+  examen: { label: "Examen", color: "#B87322" },
+  otro: { label: "Otro", color: "#8A939C" },
+};
+
+export const CATEGORIAS_DOC = {
+  hemograma: "Hemograma",
+  colesterol: "Colesterol",
+  tiroides: "Tiroides",
+  orden: "Orden médica",
+  otro: "Otro",
 };
 
 export const CICLO = {
