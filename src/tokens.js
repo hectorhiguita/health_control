@@ -1,5 +1,5 @@
 export const C = {
-  ink: "#16222E", ink70: "#4A5763", ink40: "#8A939C",
+  ink: "#16222E", ink70: "#4A5763", ink40: "#646D76", // 4.7:1 sobre paper, 5.3:1 sobre blanco (WCAG AA)
   paper: "#F4F2ED", surface: "#FFFFFF", line: "#DFDAD1",
   sage: "#3F7A6B", sageBg: "#EAF2EF",
   amber: "#B87322", amberBg: "#FAF1E3",

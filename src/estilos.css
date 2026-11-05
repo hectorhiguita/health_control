@@ -27,6 +27,22 @@ table { border-spacing: 0; }
   }
 }
 
+/* Celular: las 8 pestañas en rejilla de 2 columnas, sin scroll oculto */
+@media (max-width: 640px) {
+  nav.pestanas {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    overflow: visible !important;
+    padding-bottom: 10px;
+  }
+  nav.pestanas button {
+    padding: 10px 8px !important;
+    white-space: normal !important;
+    text-align: left;
+    border-radius: 2px !important;
+  }
+}
+
 @media print {
   header nav, button { display: none !important; }
 }

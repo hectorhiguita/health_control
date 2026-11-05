@@ -17,12 +17,13 @@ export default function SeccionSignos({ datos, onAgregar, onEliminar }) {
     if (!form.fecha || guardando) return;
     setGuardando(true);
     try {
-      await onAgregar({
+      const ok = await onAgregar({
         fecha: form.fecha, peso: num(form.peso), sis: num(form.sis),
         dia: num(form.dia), fc: num(form.fc), spo2: num(form.spo2),
         temp: num(form.temp), nota: form.nota.trim(),
       });
-      setForm({ ...VACIO, fecha: hoyISO() });
+      // Si falló, se conserva lo escrito
+      if (ok !== false) setForm({ ...VACIO, fecha: hoyISO() });
     } finally {
       setGuardando(false);
     }
@@ -35,7 +36,7 @@ export default function SeccionSignos({ datos, onAgregar, onEliminar }) {
   const conPA = serie.filter((d) => d.sis != null);
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       <Tarjeta>
         <Etiqueta>Registrar signos vitales</Etiqueta>
         <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.ink70, marginBottom: 16 }}>
@@ -65,7 +66,7 @@ export default function SeccionSignos({ datos, onAgregar, onEliminar }) {
           <Etiqueta>Peso · kg</Etiqueta>
           <div style={{ height: 170, marginTop: 10 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={conPeso} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
+              <LineChart data={conPeso} margin={{ top: 5, right: 24, left: -18, bottom: 0 }}>
                 <CartesianGrid stroke={C.line} strokeDasharray="2 4" vertical={false} />
                 <XAxis dataKey="etiqueta" tick={{ fontSize: 10, fill: C.ink40, fontFamily: FONT_DATA }} axisLine={{ stroke: C.line }} tickLine={false} />
                 <YAxis domain={["dataMin - 3", "dataMax + 3"]} tick={{ fontSize: 10, fill: C.ink40, fontFamily: FONT_DATA }} axisLine={false} tickLine={false} />
@@ -82,7 +83,7 @@ export default function SeccionSignos({ datos, onAgregar, onEliminar }) {
           <Etiqueta>Presión arterial · mmHg</Etiqueta>
           <div style={{ height: 180, marginTop: 10 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={conPA} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
+              <LineChart data={conPA} margin={{ top: 5, right: 24, left: -18, bottom: 0 }}>
                 <CartesianGrid stroke={C.line} strokeDasharray="2 4" vertical={false} />
                 <XAxis dataKey="etiqueta" tick={{ fontSize: 10, fill: C.ink40, fontFamily: FONT_DATA }} axisLine={{ stroke: C.line }} tickLine={false} />
                 <YAxis domain={[40, 180]} tick={{ fontSize: 10, fill: C.ink40, fontFamily: FONT_DATA }} axisLine={false} tickLine={false} />
@@ -128,7 +129,7 @@ export default function SeccionSignos({ datos, onAgregar, onEliminar }) {
                     <td style={celda()}>{d.sis != null ? `${d.sis}/${d.dia ?? "—"}` : "—"}</td>
                     <td style={celda()}>{d.fc ?? "—"}</td>
                     <td style={{ ...celda(), textAlign: "right" }}>
-                      <BotonBorrar onClick={() => onEliminar(d.id)} />
+                      <BotonBorrar que={`los signos del ${fmtFecha(d.fecha)}`} onClick={() => onEliminar(d.id)} />
                     </td>
                   </tr>
                 ))}

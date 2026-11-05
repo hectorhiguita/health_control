@@ -37,7 +37,7 @@ function Grafica({ clave, serie }) {
       </div>
       <div style={{ height: 170 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={conDato} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
+          <LineChart data={conDato} margin={{ top: 5, right: 24, left: -18, bottom: 0 }}>
             <ReferenceArea y1={y1} y2={y2} fill={C.sage} fillOpacity={0.08} />
             <CartesianGrid stroke={C.line} strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="etiqueta" tick={{ fontSize: 10, fill: C.ink40, fontFamily: FONT_DATA }}
@@ -70,13 +70,14 @@ export default function SeccionLaboratorios({ datos, onAgregar, onEliminar }) {
     if (!form.fecha || guardando) return;
     setGuardando(true);
     try {
-      await onAgregar({
+      const ok = await onAgregar({
         fecha: form.fecha,
         laboratorio: form.laboratorio.trim(),
         nota: form.nota.trim(),
         ...Object.fromEntries(CLAVES.map((k) => [k, num(form[k])])),
       });
-      setForm({ ...VACIO, fecha: hoyISO() });
+      // Si falló, se conserva lo escrito
+      if (ok !== false) setForm({ ...VACIO, fecha: hoyISO() });
     } finally {
       setGuardando(false);
     }
@@ -86,7 +87,7 @@ export default function SeccionLaboratorios({ datos, onAgregar, onEliminar }) {
     .map((d) => ({ ...d, etiqueta: fmtFechaCorta(d.fecha) }));
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
       <Tarjeta>
         <Etiqueta>Registrar colesterol o tiroides</Etiqueta>
         <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.ink70, marginBottom: 16 }}>
@@ -117,10 +118,14 @@ export default function SeccionLaboratorios({ datos, onAgregar, onEliminar }) {
         </div>
       </Tarjeta>
 
+      {/* Gráficas en dos columnas cuando hay espacio: menos scroll */}
       {GRUPOS_LAB.map((g) => (
-        <React.Fragment key={g.id}>
+        <div key={g.id} style={{
+          display: "grid", gap: 20,
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+        }}>
           {g.claves.map((k) => <Grafica key={k} clave={k} serie={serie} />)}
-        </React.Fragment>
+        </div>
       ))}
 
       <Tarjeta>
@@ -157,7 +162,7 @@ export default function SeccionLaboratorios({ datos, onAgregar, onEliminar }) {
                       <td key={k} style={celda()}><Valor clave={k} valor={d[k]} compacto /></td>
                     ))}
                     <td style={{ ...celda(), textAlign: "right" }}>
-                      <BotonBorrar onClick={() => onEliminar(d.id)} />
+                      <BotonBorrar que={`los resultados del ${fmtFecha(d.fecha)}`} onClick={() => onEliminar(d.id)} />
                     </td>
                   </tr>
                 ))}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { C, FONT_DISPLAY, FONT_BODY, FONT_DATA } from "./tokens";
 import { PACIENTE } from "./constantes";
 import { fmtFecha, armarReporte, hoyISO } from "./utils";
@@ -41,6 +41,12 @@ export default function App() {
   const [aviso, setAviso] = useState(null);
   const [copiado, setCopiado] = useState(false);
   const [listo, setListo] = useState(false);
+  const refAviso = useRef(null);
+
+  // Un error al final de un formulario largo quedaría fuera de vista
+  useEffect(() => {
+    if (aviso) refAviso.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [aviso]);
 
   const { hemogramas, signos, laboratorios, eventos, documentos } = datos;
   const inicioCiclo = datos.perfil?.inicioCiclo || "";
@@ -87,7 +93,7 @@ export default function App() {
   /** Ejecuta un cambio y vuelve a leer todo */
   const conError = useCallback(async (fn, msg) => {
     try { setAviso(null); const r = await fn(); await recargar(); return r; }
-    catch (e) { alFallar(e, msg); return null; }
+    catch (e) { alFallar(e, msg); return false; }
   }, [recargar, alFallar]);
 
   const ultimoHemograma = useMemo(() => hemogramas[0] || null, [hemogramas]);
@@ -132,7 +138,7 @@ export default function App() {
             <div>
               <div style={{
                 fontFamily: FONT_DATA, fontSize: 10, letterSpacing: "0.16em",
-                textTransform: "uppercase", color: "#ffffff66", marginBottom: 8,
+                textTransform: "uppercase", color: "#ffffff88", marginBottom: 8,
               }}>Seguimiento clínico</div>
               <h1 style={{
                 fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, margin: 0,
@@ -148,15 +154,17 @@ export default function App() {
               </Boton>
               <button onClick={() => salir()} title={sesion.usuario.email} style={{
                 background: "none", border: "none", cursor: "pointer",
-                fontFamily: FONT_DATA, fontSize: 10, color: "#ffffff77",
+                fontFamily: FONT_DATA, fontSize: 10, color: "#ffffff99",
                 letterSpacing: "0.1em", textTransform: "uppercase", padding: "10px 6px",
               }}>Salir</button>
             </div>
           </div>
 
-          <nav style={{ display: "flex", gap: 2, marginTop: 24, overflowX: "auto" }}>
+          {/* En celular las pestañas pasan a rejilla (ver estilos.css): todas a la vista */}
+          <nav className="pestanas" style={{ display: "flex", gap: 2, marginTop: 24, overflowX: "auto" }}>
             {PESTANAS.map(([id, label]) => (
-              <button key={id} onClick={() => setPestana(id)} style={{
+              <button key={id} onClick={() => setPestana(id)}
+                aria-current={pestana === id ? "page" : undefined} style={{
                 padding: "11px 16px", border: "none", cursor: "pointer",
                 background: pestana === id ? C.paper : "transparent",
                 color: pestana === id ? C.ink : "#ffffff99",
@@ -170,7 +178,7 @@ export default function App() {
 
       <main style={{ maxWidth: 1000, margin: "0 auto", padding: "28px 20px 0" }}>
         {aviso && (
-          <div style={{
+          <div ref={refAviso} role="alert" style={{
             background: C.amberBg, border: `1px solid ${C.amber}44`, borderRadius: 2,
             padding: "12px 16px", marginBottom: 20, fontFamily: FONT_BODY,
             fontSize: 13, color: C.ink, lineHeight: 1.5,
