@@ -95,6 +95,20 @@ aws ssm put-parameter --overwrite --type SecureString \
 
 ---
 
+## Despliegue automático (GitHub Actions)
+
+Cada push a `main` compila, valida y corre `scripts/desplegar.sh`. Los PR solo compilan y validan.
+
+| En GitHub (Settings → Secrets and variables → Actions) | Tipo |
+|---|---|
+| `ACCESS_KEY`, `SECRET_ACCESS_KEY` | Secretos — llaves de un usuario IAM |
+| `CORREO_USUARIO` | Variable — correo de la cuenta de Cognito |
+| `CORREO_ALERTAS` | Variable opcional — si falta, usa `CORREO_USUARIO` |
+
+El job usa el entorno `produccion`: ahí puedes exigir aprobación manual antes de cada despliegue.
+
+---
+
 ## Trabajar en local
 
 ```bash

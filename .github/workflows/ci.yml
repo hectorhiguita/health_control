@@ -1,10 +1,11 @@
-name: Revisar
+name: Revisar y desplegar
 
-# Solo compila y valida. El despliegue se hace con scripts/desplegar.sh
+# PR: compila y valida.  Push a main: además despliega a AWS.
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -37,3 +38,46 @@ jobs:
           terraform fmt -check -recursive
           terraform init -backend=false
           terraform validate
+
+  desplegar:
+    needs: revisar
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: produccion
+    # Nunca dos despliegues a la vez sobre el mismo estado
+    concurrency:
+      group: desplegar
+      cancel-in-progress: false
+    env:
+      AWS_REGION: us-east-1
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TF_VAR_correo_usuario: ${{ vars.CORREO_USUARIO }}
+      TF_VAR_correo_alertas: ${{ vars.CORREO_ALERTAS || vars.CORREO_USUARIO }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Sin wrapper: desplegar.sh lee `terraform output -raw`
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Falta el correo
+        if: env.TF_VAR_correo_usuario == ''
+        run: |
+          echo "::error::Crea la variable de repositorio CORREO_USUARIO (Settings → Secrets and variables → Actions → Variables)"
+          exit 1
+
+      - name: Desplegar
+        run: ./scripts/desplegar.sh -auto-approve
