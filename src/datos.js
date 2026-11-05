@@ -1,69 +1,69 @@
-import {
-  collection, doc, addDoc, deleteDoc, setDoc, getDoc, getDocs,
-  onSnapshot, query, orderBy, serverTimestamp, writeBatch,
-} from "firebase/firestore";
-import { db } from "./firebase";
-import { PACIENTE_ID, SEMILLA_HEMOGRAMAS, SEMILLA_SIGNOS } from "./constantes";
+import { token } from "./auth";
+import { SEMILLA_HEMOGRAMAS, SEMILLA_SIGNOS } from "./constantes";
 
-const refPaciente   = () => doc(db, "pacientes", PACIENTE_ID);
-const refHemogramas = () => collection(db, "pacientes", PACIENTE_ID, "hemogramas");
-const refSignos     = () => collection(db, "pacientes", PACIENTE_ID, "signos");
+const API = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
-/** Escucha en vivo. Devuelve la función para cancelar la suscripción. */
-export function escucharHemogramas(cb, onError) {
-  return onSnapshot(
-    query(refHemogramas(), orderBy("fecha", "desc")),
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-    onError
-  );
+export class ErrorApi extends Error {
+  constructor(mensaje, estado) { super(mensaje); this.estado = estado; }
 }
 
-export function escucharSignos(cb, onError) {
-  return onSnapshot(
-    query(refSignos(), orderBy("fecha", "desc")),
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-    onError
-  );
+async function pedir(ruta, { metodo = "GET", cuerpo } = {}) {
+  const r = await fetch(`${API}${ruta}`, {
+    method: metodo,
+    headers: {
+      authorization: `Bearer ${await token()}`,
+      ...(cuerpo ? { "content-type": "application/json" } : {}),
+    },
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) throw new ErrorApi(json.error || `Error ${r.status}`, r.status);
+  return json;
 }
 
-export function escucharPaciente(cb, onError) {
-  return onSnapshot(refPaciente(), (snap) => cb(snap.exists() ? snap.data() : {}), onError);
-}
+/** Todo el historial en una sola llamada. */
+export const cargarTodo = () => pedir("/datos");
 
-export const agregarHemograma = (d) =>
-  addDoc(refHemogramas(), { ...d, creado: serverTimestamp() });
-
-export const borrarHemograma = (id) =>
-  deleteDoc(doc(db, "pacientes", PACIENTE_ID, "hemogramas", id));
-
-export const agregarSigno = (d) =>
-  addDoc(refSignos(), { ...d, creado: serverTimestamp() });
-
-export const borrarSigno = (id) =>
-  deleteDoc(doc(db, "pacientes", PACIENTE_ID, "signos", id));
+export const agregar = (tipo, d) => pedir(`/registros/${tipo}`, { metodo: "POST", cuerpo: d });
+export const borrar = (tipo, id) => pedir(`/registros/${tipo}/${id}`, { metodo: "DELETE" });
 
 export const guardarInicioCiclo = (fecha) =>
-  setDoc(refPaciente(), { inicioCiclo: fecha, actualizado: serverTimestamp() }, { merge: true });
+  pedir("/perfil", { metodo: "PUT", cuerpo: { inicioCiclo: fecha } });
+
+export async function subirDocumento(archivo, meta) {
+  const { documento, subida } = await pedir("/documentos", {
+    metodo: "POST",
+    cuerpo: { ...meta, nombre: archivo.name, mime: archivo.type, tamano: archivo.size },
+  });
+  const form = new FormData();
+  Object.entries(subida.fields).forEach(([k, v]) => form.append(k, v));
+  form.append("file", archivo);
+  const r = await fetch(subida.url, { method: "POST", body: form });
+  if (!r.ok) {
+    await borrarDocumento(documento.id).catch(() => {});
+    throw new ErrorApi("No se pudo subir el archivo", r.status);
+  }
+  return documento;
+}
+
+export const urlDocumento = (id) => pedir(`/documentos/${id}/url`).then((r) => r.url);
+export const borrarDocumento = (id) => pedir(`/documentos/${id}`, { metodo: "DELETE" });
+
+export const preguntarAsistente = (pregunta, historial) =>
+  pedir("/asistente", { metodo: "POST", cuerpo: { pregunta, historial } }).then((r) => r.respuesta);
 
 /**
  * Siembra los datos clínicos de partida una única vez.
- * Marca el documento del paciente para no repetirlo nunca.
+ * Marca el perfil para no repetirlo nunca.
  */
-export async function sembrarSiHaceFalta() {
-  const snap = await getDoc(refPaciente());
-  if (snap.exists() && snap.data().sembrado) return false;
-
-  const hemo = await getDocs(refHemogramas());
-  const sig = await getDocs(refSignos());
-  if (!hemo.empty || !sig.empty) {
-    await setDoc(refPaciente(), { sembrado: true }, { merge: true });
-    return false;
+export async function sembrarSiHaceFalta(datos) {
+  if (datos.perfil?.sembrado) return false;
+  if (!datos.hemogramas.length && !datos.signos.length) {
+    await Promise.all([
+      ...SEMILLA_HEMOGRAMAS.map((h) => agregar("hemogramas", h)),
+      ...SEMILLA_SIGNOS.map((s) => agregar("signos", s)),
+    ]);
   }
-
-  const lote = writeBatch(db);
-  SEMILLA_HEMOGRAMAS.forEach((h) => lote.set(doc(refHemogramas()), h));
-  SEMILLA_SIGNOS.forEach((s) => lote.set(doc(refSignos()), s));
-  lote.set(refPaciente(), { sembrado: true, creado: serverTimestamp() }, { merge: true });
-  await lote.commit();
+  await pedir("/perfil", { metodo: "PUT", cuerpo: { sembrado: true } });
   return true;
 }

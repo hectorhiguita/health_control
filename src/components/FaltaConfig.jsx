@@ -15,12 +15,12 @@ export default function FaltaConfig() {
         <h1 style={{
           fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, color: "#fff",
           margin: "0 0 14px", letterSpacing: "-0.02em",
-        }}>Falta conectar Firebase</h1>
+        }}>Falta conectar AWS</h1>
         <p style={{ fontFamily: FONT_BODY, fontSize: 14, color: "#ffffff99", lineHeight: 1.6 }}>
-          Copia <code style={codigo}>.env.example</code> a <code style={codigo}>.env</code> y pega ahí
-          las credenciales de tu proyecto Firebase. Si estás publicando en GitHub Pages,
-          agrégalas como secretos del repositorio. Los pasos completos están
-          en <code style={codigo}>FIREBASE_SETUP.md</code>.
+          Despliega la infraestructura y genera el archivo de entorno con
+          <code style={codigo}>scripts/desplegar.sh</code>. Para trabajar en local,
+          corre <code style={codigo}>scripts/env-local.sh</code>. Los pasos están
+          en <code style={codigo}>README.md</code>.
         </p>
       </div>
     </div>

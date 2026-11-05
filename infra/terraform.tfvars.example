@@ -1,0 +1,5 @@
+# Copia a terraform.tfvars (no se sube a git)
+correo_usuario          = "hahiguit@gmail.com"
+correo_alertas          = "hahiguit@gmail.com"
+presupuesto_mensual_usd = 5
+# modelo_claude         = "claude-opus-5-5"

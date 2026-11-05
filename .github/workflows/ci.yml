@@ -1,0 +1,39 @@
+name: Revisar
+
+# Solo compila y valida. El despliegue se hace con scripts/desplegar.sh
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: API
+        working-directory: backend
+        run: |
+          npm ci --omit=dev
+          node --check src/index.mjs
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform
+        working-directory: infra
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false
+          terraform validate
