@@ -92,8 +92,8 @@ resource "aws_lambda_function" "api" {
   memory_size      = 512
   timeout          = 29
 
-  # Una sola persona: tope bajo para frenar abusos y gasto
-  reserved_concurrent_executions = 5
+  # Sin concurrencia reservada: las cuentas nuevas tienen tope de 10 y AWS
+  # no deja reservar. El freno de abusos está en el throttling de la API.
 
   environment {
     variables = {
