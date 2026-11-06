@@ -11,13 +11,14 @@ import {
   PREFIJO, ErrorDatos, validarRegistro, validarDocumento, validarPerfil, MAX_BYTES_DOC,
 } from "./validar.mjs";
 import { preguntar } from "./asistente.mjs";
+import * as usuarios from "./usuarios.mjs";
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
   marshallOptions: { removeUndefinedValues: true },
 });
 const s3 = new S3Client({});
 
-const { TABLA, BUCKET, PACIENTE_ID, GRUPO } = process.env;
+const { TABLA, BUCKET, PACIENTE_ID, GRUPO_ADMIN, GRUPO_EDITOR, GRUPO_LECTOR } = process.env;
 const PK = `PAC#${PACIENTE_ID}`;
 
 /* Umbrales que se le pasan al asistente (copia de src/constantes.js) */
@@ -51,11 +52,19 @@ const leerCuerpo = (evento) => {
   try { return JSON.parse(crudo); } catch { throw new ErrorDatos("JSON inválido"); }
 };
 
-/** Además del token válido, la persona debe estar en el grupo. */
-function autorizado(evento) {
-  const grupos = evento.requestContext?.authorizer?.jwt?.claims?.["cognito:groups"] ?? "";
+/** Además del token válido, la persona debe estar en un grupo con acceso. */
+function permisos(evento) {
+  const claims = evento.requestContext?.authorizer?.jwt?.claims ?? {};
   // Llega como "[familia otro]" o "familia"
-  return String(grupos).replace(/[[\]]/g, "").split(/[\s,]+/).includes(GRUPO);
+  const grupos = String(claims["cognito:groups"] ?? "").replace(/[[\]]/g, "").split(/[\s,]+/);
+  const admin = grupos.includes(GRUPO_ADMIN);
+  const editor = admin || grupos.includes(GRUPO_EDITOR);
+  return {
+    quien: claims.username,
+    admin,
+    editor,
+    lector: editor || grupos.includes(GRUPO_LECTOR),
+  };
 }
 
 async function todo() {
@@ -159,14 +168,32 @@ async function borrarDocumento(id) {
 }
 
 export async function handler(evento) {
-  if (!autorizado(evento)) return responder(403, { error: "Sin acceso" });
+  const p = permisos(evento);
+  if (!p.lector) return responder(403, { error: "Sin acceso" });
 
   const metodo = evento.requestContext.http.method;
   const partes = (evento.rawPath || "/").split("/").filter(Boolean);
   const [recurso, a, b] = partes;
 
+  // Quien solo lee puede consultar y preguntar, nada más
+  const soloLectura = (metodo === "GET" && ["datos", "documentos", "yo"].includes(recurso))
+    || (metodo === "POST" && recurso === "asistente");
+  if (!p.editor && !soloLectura) return responder(403, { error: "Tu cuenta solo puede ver el seguimiento" });
+
   try {
+    if (metodo === "GET" && recurso === "yo") {
+      return responder(200, { rol: p.admin ? "admin" : p.editor ? "editor" : "lector" });
+    }
+
     if (metodo === "GET" && recurso === "datos") return responder(200, await todo());
+
+    if (recurso === "usuarios") {
+      if (!p.admin) return responder(403, { error: "Solo el administrador maneja las cuentas" });
+      if (metodo === "GET" && !a) return responder(200, await usuarios.listar());
+      if (metodo === "POST" && !a) return responder(201, await usuarios.crear(leerCuerpo(evento)));
+      if (metodo === "PUT" && a) { await usuarios.cambiarRol(a, leerCuerpo(evento).rol, p.quien); return responder(200, { ok: true }); }
+      if (metodo === "DELETE" && a) { await usuarios.borrar(a, p.quien); return responder(200, { ok: true }); }
+    }
 
     if (recurso === "perfil" && metodo === "PUT") {
       await guardarPerfil(leerCuerpo(evento));
@@ -197,6 +224,8 @@ export async function handler(evento) {
     if (e instanceof ErrorDatos) return responder(400, { error: e.message });
     if (e.message === "SIN_LLAVE") return responder(503, { error: "Falta configurar la llave de Claude (ver README)." });
     if (e?.name === "APIConnectionTimeoutError") return responder(504, { error: "Claude tardó demasiado. Intenta una pregunta más corta." });
+    if (/credit balance/i.test(e?.message ?? "")) return responder(503, { error: "La cuenta de Anthropic no tiene saldo. Recárgala en console.anthropic.com → Plans & Billing." });
+    if (e?.status === 401) return responder(503, { error: "La llave de Anthropic no es válida. Revisa el parámetro en SSM." });
     console.error(JSON.stringify({ ruta: evento.rawPath, error: e?.name, mensaje: e?.message }));
     return responder(500, { error: "Error interno" });
   }

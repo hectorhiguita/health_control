@@ -4,8 +4,11 @@ import { PACIENTE } from "./constantes";
 import { fmtFecha, armarReporte, hoyISO } from "./utils";
 import { configurado, observarSesion, usuarioActual, salir } from "./auth";
 import {
+  useInactividad, sesionVencida, anotarSalidaPorInactividad,
+} from "./inactividad";
+import {
   cargarTodo, agregar, borrar, guardarInicioCiclo, sembrarSiHaceFalta,
-  subirDocumento, urlDocumento, borrarDocumento, preguntarAsistente,
+  subirDocumento, urlDocumento, borrarDocumento, preguntarAsistente, miRol,
 } from "./datos";
 
 import Acceso from "./components/Acceso";
@@ -19,7 +22,8 @@ import SeccionCalendario from "./components/SeccionCalendario";
 import SeccionDocumentos from "./components/SeccionDocumentos";
 import SeccionAsistente from "./components/SeccionAsistente";
 import SeccionAlarmas from "./components/SeccionAlarmas";
-import { Tarjeta, Etiqueta, Boton, Valor } from "./components/ui";
+import SeccionUsuarios from "./components/SeccionUsuarios";
+import { Tarjeta, Etiqueta, Boton, Valor, PermisoEdicion } from "./components/ui";
 
 const PESTANAS = [
   ["resumen", "Resumen"],
@@ -41,7 +45,9 @@ export default function App() {
   const [aviso, setAviso] = useState(null);
   const [copiado, setCopiado] = useState(false);
   const [listo, setListo] = useState(false);
+  const [rol, setRol] = useState("lector");
   const refAviso = useRef(null);
+  const puedeEditar = rol === "editor" || rol === "admin";
 
   // Un error al final de un formulario largo quedaría fuera de vista
   useEffect(() => {
@@ -56,14 +62,29 @@ export default function App() {
     if (!configurado) return;
     const revisar = async () => {
       const u = await usuarioActual();
+      // Volvió después de más de 30 min sin uso (pestaña cerrada, otro día…)
+      if (u && sesionVencida()) {
+        anotarSalidaPorInactividad();
+        setSesion({ estado: "fuera", usuario: null });
+        await salir();
+        return;
+      }
       setSesion(u ? { estado: "dentro", usuario: u } : { estado: "fuera", usuario: null });
     };
     revisar();
     return observarSesion(revisar);
   }, []);
 
+  useInactividad(sesion.estado === "dentro", async () => {
+    anotarSalidaPorInactividad();
+    setSesion({ estado: "fuera", usuario: null });
+    setListo(false);
+    setDatos(VACIO);
+    await salir();
+  });
+
   const alFallar = useCallback((e, msg) => {
-    if (e?.estado === 403) setAviso("Esta cuenta no tiene acceso. Pide que la agreguen al grupo «familia» en Cognito.");
+    if (e?.estado === 403) setAviso(e.message || "Esta cuenta no tiene acceso.");
     else setAviso(e?.message ? `${msg} (${e.message})` : msg);
   }, []);
 
@@ -79,8 +100,9 @@ export default function App() {
     let cancelado = false;
     (async () => {
       try {
-        const d = await recargar();
-        if (await sembrarSiHaceFalta(d)) await recargar();
+        const [d, r] = await Promise.all([recargar(), miRol()]);
+        if (!cancelado) setRol(r);
+        if (r !== "lector" && await sembrarSiHaceFalta(d)) await recargar();
       } catch (e) {
         if (!cancelado) alFallar(e, "No se pudieron cargar los registros.");
       } finally {
@@ -116,11 +138,16 @@ export default function App() {
     }
   };
 
+  // Sin onAgregar/onEliminar las secciones ocultan formularios y botones de borrar
   const registros = (tipo, nombre) => ({
     datos: datos[tipo],
-    onAgregar: (d) => conError(() => agregar(tipo, d), `No se pudo guardar ${nombre}.`),
-    onEliminar: (id) => conError(() => borrar(tipo, id), "No se pudo borrar el registro."),
+    ...(puedeEditar && {
+      onAgregar: (d) => conError(() => agregar(tipo, d), `No se pudo guardar ${nombre}.`),
+      onEliminar: (id) => conError(() => borrar(tipo, id), "No se pudo borrar el registro."),
+    }),
   });
+
+  const pestanas = rol === "admin" ? [...PESTANAS, ["usuarios", "Usuarios"]] : PESTANAS;
 
   if (!configurado) return <FaltaConfig />;
   if (sesion.estado === "cargando") return <Pantalla texto="Verificando acceso…" />;
@@ -152,6 +179,12 @@ export default function App() {
               <Boton variante="linea" onClick={copiarReporte} style={{ color: "#fff", borderColor: "#ffffff44" }}>
                 {copiado ? "Copiado ✓" : "Copiar reporte"}
               </Boton>
+              {!puedeEditar && (
+                <span style={{
+                  fontFamily: FONT_DATA, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase",
+                  color: "#ffffffcc", border: "1px solid #ffffff44", borderRadius: 2, padding: "6px 8px",
+                }}>Solo lectura</span>
+              )}
               <button onClick={() => salir()} title={sesion.usuario.email} style={{
                 background: "none", border: "none", cursor: "pointer",
                 fontFamily: FONT_DATA, fontSize: 10, color: "#ffffff99",
@@ -161,8 +194,8 @@ export default function App() {
           </div>
 
           {/* En celular las pestañas pasan a rejilla (ver estilos.css): todas a la vista */}
-          <nav className="pestanas" style={{ display: "flex", gap: 2, marginTop: 24, overflowX: "auto" }}>
-            {PESTANAS.map(([id, label]) => (
+          <nav className="pestanas" style={{ display: "flex", flexWrap: "wrap", gap: 2, marginTop: 24 }}>
+            {pestanas.map(([id, label]) => (
               <button key={id} onClick={() => setPestana(id)}
                 aria-current={pestana === id ? "page" : undefined} style={{
                 padding: "11px 16px", border: "none", cursor: "pointer",
@@ -176,6 +209,7 @@ export default function App() {
         </div>
       </header>
 
+      <PermisoEdicion.Provider value={puedeEditar}>
       <main style={{ maxWidth: 1000, margin: "0 auto", padding: "28px 20px 0" }}>
         {aviso && (
           <div ref={refAviso} role="alert" style={{
@@ -190,6 +224,7 @@ export default function App() {
             <BandaEstado ultimoHemograma={ultimoHemograma} ultimoSigno={ultimoSigno} />
             <RejillaCiclo
               inicioCiclo1={inicioCiclo}
+              soloLectura={!puedeEditar}
               onCambiarInicio={(v) => conError(() => guardarInicioCiclo(v), "No se pudo guardar la fecha del ciclo.")}
             />
 
@@ -241,15 +276,19 @@ export default function App() {
         {pestana === "documentos" && (
           <SeccionDocumentos
             datos={documentos}
-            onSubir={(f, meta) => conError(() => subirDocumento(f, meta), "No se pudo subir el documento.")}
             onAbrir={(id) => urlDocumento(id).catch((e) => { alFallar(e, "No se pudo abrir el documento."); return null; })}
-            onEliminar={(id) => conError(() => borrarDocumento(id), "No se pudo borrar el documento.")}
+            {...(puedeEditar && {
+              onSubir: (f, meta) => conError(() => subirDocumento(f, meta), "No se pudo subir el documento."),
+              onEliminar: (id) => conError(() => borrarDocumento(id), "No se pudo borrar el documento."),
+            })}
           />
         )}
 
         {pestana === "asistente" && <SeccionAsistente onPreguntar={preguntarAsistente} />}
 
         {pestana === "alarmas" && <SeccionAlarmas />}
+
+        {pestana === "usuarios" && rol === "admin" && <SeccionUsuarios yo={sesion.usuario.id} />}
 
         <footer style={{
           marginTop: 40, paddingTop: 20, borderTop: `1px solid ${C.line}`,
@@ -261,6 +300,7 @@ export default function App() {
           <div>Esta herramienta registra y organiza datos. No reemplaza el hemograma de laboratorio ni el criterio del médico tratante.</div>
         </footer>
       </main>
+      </PermisoEdicion.Provider>
     </div>
   );
 }

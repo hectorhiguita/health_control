@@ -88,7 +88,7 @@ export default function SeccionLaboratorios({ datos, onAgregar, onEliminar }) {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
-      <Tarjeta>
+      <Tarjeta soloEditor>
         <Etiqueta>Registrar colesterol o tiroides</Etiqueta>
         <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.ink70, marginBottom: 16 }}>
           Llena solo los valores que trae el examen. Los rangos son generales: compáralos con los del laboratorio.

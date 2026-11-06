@@ -1,7 +1,10 @@
-import React from "react";
+import React, { createContext, useContext } from "react";
 import { C, FONT_DATA, FONT_BODY, COLOR_ESTADO } from "../tokens";
 import { UMBRALES } from "../constantes";
 import { evaluar } from "../utils";
+
+/** false para cuentas de solo lectura: oculta formularios y botones de borrar. */
+export const PermisoEdicion = createContext(true);
 
 export function Etiqueta({ children, style }) {
   return (
@@ -12,7 +15,9 @@ export function Etiqueta({ children, style }) {
   );
 }
 
-export function Tarjeta({ children, style }) {
+export function Tarjeta({ children, style, soloEditor }) {
+  const puedeEditar = useContext(PermisoEdicion);
+  if (soloEditor && !puedeEditar) return null;
   return (
     <div style={{
       background: C.surface, border: `1px solid ${C.line}`,
@@ -111,6 +116,8 @@ export const celda = (izq) => ({
 
 /** Pide confirmación: lo borrado no se puede recuperar desde la app. */
 export function BotonBorrar({ onClick, que = "este registro" }) {
+  const puedeEditar = useContext(PermisoEdicion);
+  if (!puedeEditar) return null;
   const confirmar = () => {
     if (window.confirm(`¿Borrar ${que}? No se puede deshacer.`)) onClick();
   };

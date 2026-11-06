@@ -34,7 +34,7 @@ export default function SeccionHemogramas({ datos, onAgregar, onEliminar }) {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
-      <Tarjeta>
+      <Tarjeta soloEditor>
         <Etiqueta>Registrar hemograma</Etiqueta>
         <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.ink70, marginBottom: 16 }}>
           Neutrófilos, plaquetas y hemoglobina son los tres que definen si hay que ir a urgencias.
