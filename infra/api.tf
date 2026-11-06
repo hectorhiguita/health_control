@@ -67,6 +67,16 @@ resource "aws_iam_role_policy" "api" {
         Condition = { StringEquals = { "kms:ViaService" = "ssm.${var.region}.amazonaws.com" } }
       },
       {
+        Sid    = "Cuentas"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:ListUsers", "cognito-idp:AdminListGroupsForUser", "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminAddUserToGroup", "cognito-idp:AdminRemoveUserFromGroup",
+          "cognito-idp:AdminDeleteUser", "cognito-idp:AdminUserGlobalSignOut",
+        ]
+        Resource = aws_cognito_user_pool.usuarios.arn
+      },
+      {
         Sid      = "Logs"
         Effect   = "Allow"
         Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
@@ -100,7 +110,10 @@ resource "aws_lambda_function" "api" {
       TABLA         = aws_dynamodb_table.registros.name
       BUCKET        = aws_s3_bucket.documentos.bucket
       PACIENTE_ID   = var.paciente_id
-      GRUPO         = aws_cognito_user_group.familia.name
+      USER_POOL_ID  = aws_cognito_user_pool.usuarios.id
+      GRUPO_ADMIN   = aws_cognito_user_group.admin.name
+      GRUPO_EDITOR  = aws_cognito_user_group.familia.name
+      GRUPO_LECTOR  = aws_cognito_user_group.lector.name
       PARAM_CLAUDE  = aws_ssm_parameter.llave_claude.name
       MODELO_CLAUDE = var.modelo_claude
       NODE_OPTIONS  = "--enable-source-maps"

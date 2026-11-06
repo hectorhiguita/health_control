@@ -52,7 +52,7 @@ export default function SeccionDocumentos({ datos, onSubir, onAbrir, onEliminar 
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
-      <Tarjeta>
+      <Tarjeta soloEditor>
         <Etiqueta>Subir examen</Etiqueta>
         <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.ink70, marginBottom: 16 }}>
           PDF o foto, hasta {MAX_MB} MB. Se guarda cifrado y solo tú puedes abrirlo.

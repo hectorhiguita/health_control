@@ -21,6 +21,15 @@ async function pedir(ruta, { metodo = "GET", cuerpo } = {}) {
   return json;
 }
 
+/** "admin" | "editor" | "lector" según los grupos de Cognito. */
+export const miRol = () => pedir("/yo").then((r) => r.rol);
+
+export const listarUsuarios = () => pedir("/usuarios");
+export const crearUsuario = (u) => pedir("/usuarios", { metodo: "POST", cuerpo: u });
+export const cambiarRolUsuario = (id, rol) =>
+  pedir(`/usuarios/${encodeURIComponent(id)}`, { metodo: "PUT", cuerpo: { rol } });
+export const borrarUsuario = (id) => pedir(`/usuarios/${encodeURIComponent(id)}`, { metodo: "DELETE" });
+
 /** Todo el historial en una sola llamada. */
 export const cargarTodo = () => pedir("/datos");
 

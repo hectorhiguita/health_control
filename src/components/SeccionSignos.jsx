@@ -37,7 +37,7 @@ export default function SeccionSignos({ datos, onAgregar, onEliminar }) {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 }}>
-      <Tarjeta>
+      <Tarjeta soloEditor>
         <Etiqueta>Registrar signos vitales</Etiqueta>
         <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.ink70, marginBottom: 16 }}>
           Con neutropenia, una sola temperatura de 38 °C o más obliga a ir a urgencias.

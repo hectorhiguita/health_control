@@ -1,9 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { C, FONT_DISPLAY, FONT_BODY, FONT_DATA } from "../tokens";
 import { entrar } from "../auth";
+import { leerMotivoSalida, borrarMotivoSalida, MINUTOS_INACTIVIDAD } from "../inactividad";
 
 export default function Acceso() {
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(() => leerMotivoSalida() === "inactividad"
+    ? `Se cerró la sesión tras ${MINUTOS_INACTIVIDAD} minutos sin uso. Vuelve a entrar.` : null);
+  // Se borra después de mostrarlo una vez
+  useEffect(() => { borrarMotivoSalida(); }, []);
   const [entrando, setEntrando] = useState(false);
 
   const iniciar = async () => {

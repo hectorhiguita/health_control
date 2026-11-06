@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { C, FONT_BODY, FONT_DATA, FONT_DISPLAY } from "../tokens";
 import { TIPOS_EVENTO, CICLO } from "../constantes";
 import { hoyISO, fmtFecha, sumarDias } from "../utils";
-import { Tarjeta, Etiqueta, Campo, Boton, celda, BotonBorrar } from "./ui";
+import { Tarjeta, Etiqueta, Campo, Boton, celda, BotonBorrar, PermisoEdicion } from "./ui";
 
 const VACIO = { fecha: "", hora: "", tipo: "cita", titulo: "", lugar: "", dosis: "", nota: "" };
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
@@ -72,6 +72,7 @@ function Mes({ anio, mes, eventosPorDia, hoy, elegido, onElegir }) {
 
 export default function SeccionCalendario({ datos, onAgregar, onEliminar }) {
   const hoy = hoyISO();
+  const puedeEditar = useContext(PermisoEdicion);
   const [form, setForm] = useState({ ...VACIO, fecha: hoy });
   const [guardando, setGuardando] = useState(false);
   const [vista, setVista] = useState(() => ({ anio: Number(hoy.slice(0, 4)), mes: Number(hoy.slice(5, 7)) - 1 }));
@@ -163,9 +164,11 @@ export default function SeccionCalendario({ datos, onAgregar, onEliminar }) {
         </div>
         <Mes anio={vista.anio} mes={vista.mes} eventosPorDia={eventosPorDia} hoy={hoy}
           elegido={form.fecha} onElegir={(f) => setForm({ ...form, fecha: f })} />
-        <div style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.ink70, marginTop: 8 }}>
-          Toca un día para agendar en esa fecha.
-        </div>
+        {puedeEditar && (
+          <div style={{ fontFamily: FONT_BODY, fontSize: 12, color: C.ink70, marginTop: 8 }}>
+            Toca un día para agendar en esa fecha.
+          </div>
+        )}
         <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
           {Object.entries(TIPOS_EVENTO).map(([k, t]) => (
             <span key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: FONT_DATA, fontSize: 10, color: C.ink70, textTransform: "uppercase", letterSpacing: "0.08em" }}>
@@ -175,7 +178,7 @@ export default function SeccionCalendario({ datos, onAgregar, onEliminar }) {
         </div>
       </Tarjeta>
 
-      <Tarjeta>
+      <Tarjeta soloEditor>
         <Etiqueta>Agregar al calendario</Etiqueta>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
           <Campo label="Fecha" type="date" value={form.fecha} onChange={set("fecha")} />

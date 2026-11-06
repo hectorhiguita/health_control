@@ -16,6 +16,12 @@ resource "aws_cognito_user_pool" "usuarios" {
 
   admin_create_user_config {
     allow_admin_create_user_only = true
+
+    invite_message_template {
+      email_subject = "Acceso al seguimiento clínico"
+      email_message = "Te dieron acceso al seguimiento clínico.<br><br>Usuario: {username}<br>Clave temporal: {####}<br><br>Al entrar te pedirá una clave nueva y configurar una app de autenticación (Google Authenticator, Microsoft Authenticator o similar). La clave temporal vence en 3 días."
+      sms_message   = "Seguimiento clínico. Usuario {username}, clave temporal {####}"
+    }
   }
 
   password_policy {
@@ -95,5 +101,25 @@ resource "aws_cognito_user" "titular" {
 resource "aws_cognito_user_in_group" "titular" {
   user_pool_id = aws_cognito_user_pool.usuarios.id
   group_name   = aws_cognito_user_group.familia.name
+  username     = aws_cognito_user.titular.username
+}
+
+# Puede crear y quitar cuentas desde la app. Solo se asigna aquí.
+resource "aws_cognito_user_group" "admin" {
+  name         = "admin"
+  user_pool_id = aws_cognito_user_pool.usuarios.id
+  description  = "Administra las cuentas desde la app"
+}
+
+# Solo ve el seguimiento (paciente, médico). Se asigna desde la app.
+resource "aws_cognito_user_group" "lector" {
+  name         = "lector"
+  user_pool_id = aws_cognito_user_pool.usuarios.id
+  description  = "Solo lectura"
+}
+
+resource "aws_cognito_user_in_group" "titular_admin" {
+  user_pool_id = aws_cognito_user_pool.usuarios.id
+  group_name   = aws_cognito_user_group.admin.name
   username     = aws_cognito_user.titular.username
 }
